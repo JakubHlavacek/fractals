@@ -1062,7 +1062,7 @@ function t19_julia_gl64() {
 app();
 function app() {
     setStyle(document.body, { padding: "30px 10px 20px 80px", });
-    ac(document.body, myCreateElement("a", { href: "https://github.com/JakubHlavacek/fractals", style: { display: "block", float: "right", width: "24px", height: "24px", }, title: "GitHub", target: "_blank" }, githubIcon()));
+    ac(document.body, myCreateElement("a", { href: "https://github.com/JakubHlavacek/fractals", style: { display: "block", float: "right", marginRight: "50px", width: "24px", height: "24px", }, title: "GitHub", target: "_blank" }, githubIcon()));
     ac(document.body, t19_julia_gl64());
 }
 function githubIcon() {
