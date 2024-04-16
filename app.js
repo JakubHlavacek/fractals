@@ -640,9 +640,9 @@ function t19_julia_gl64() {
                         }
                         // touch zoom
                         //console.log(event.clientX, event.clientY);
-                        //event = { touches: [{ pageX: 380, pageY: 315, }, { pageX: event.clientX, pageY: event.clientY, },], };
+                        //event = { touches: [{ clientX: 380, clientY: 315, }, { clientX: event.clientX, clientY: event.clientY, },], };
                         if (isTouchEvent(event) && event.touches.length >= 2) {
-                            const width2 = Math.hypot(event.touches[1].pageX - event.touches[0].pageX, event.touches[1].pageY - event.touches[0].pageY);
+                            const width2 = Math.hypot(event.touches[1].clientX - event.touches[0].clientX, event.touches[1].clientY - event.touches[0].clientY);
                             if (width2 !== 0 && lastWidth !== 0) {
                                 const clientRect = canv.getBoundingClientRect();
                                 const prevScale2 = p.scale;
