@@ -16,7 +16,7 @@ Julia and Mandelbrot set with WebGL2 and float64.<br/>
 
 <div><b>Maybe sometime:</b></div>
 
-- Support phone browsers
+- Support mobile browsers
 
 <div><b>Based on:</b></div>
 

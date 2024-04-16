@@ -136,8 +136,12 @@ function setMouseTracking(elem, ondown, onmove, onup) {
 }
 function eventPosToElement(e, elem) {
     const rect = elem.getBoundingClientRect();
-    const pos = isTouchEvent(e) ? e.touches[0] : e;
+    const pos = isTouchEvent(e) ? {
+        clientX: avg(range(e.touches.length).map(i => e.touches[i].clientX)),
+        clientY: avg(range(e.touches.length).map(i => e.touches[i].clientY)),
+    } : e;
     return { x: pos.clientX - rect.left, y: pos.clientY - rect.top, };
+    function avg(a) { return a.reduce((prev, cur) => prev + cur, 0) / a.length; }
 }
 class TSpan {
     static fromSeconds(n) { return TSpan.second * n; }
@@ -596,34 +600,62 @@ function t19_julia_gl64() {
             function setupInteraction2(canv) {
                 new ResizeObserver(() => { redraw = true; }).observe(canv);
                 let prevPos = { x: 0, y: 0, };
-                setMouseTracking(canv, event => prevPos = eventPosToElement(event, canv), event => {
-                    const pos = eventPosToElement(event, canv);
-                    const dx = pos.x - prevPos.x;
-                    const dy = -(pos.y - prevPos.y);
-                    prevPos = pos;
-                    const [left, right,] = [1, 2,].map(i => (event.buttons & i) === i);
-                    if (left) {
-                        p.centerX -= dx * p.scale;
-                        p.centerY -= dy * p.scale;
-                        redraw = true;
-                        writeHashParams();
+                let lastTouchesCount;
+                let lastWidth;
+                setMouseTracking(canv, event => { prevPos = eventPosToElement(event, canv); lastTouchesCount = 0; lastWidth = 0; }, event => {
+                    if (isTouchEvent(event) && lastTouchesCount !== event.touches.length) {
+                        prevPos = eventPosToElement(event, canv);
+                        lastTouchesCount = event.touches.length;
+                        lastWidth = 0;
                     }
-                    if (!p.drawMandelbrot && right) {
-                        //juliaX += 0.1 * dx * scale;
-                        //juliaY += 0.1 * dy * scale;
-                        const slow = event.ctrlKey;
-                        const fast = event.shiftKey;
-                        const speed = slow && fast ? 0.01 : slow ? 0.1 : fast ? 10 : 1;
-                        const rPrev = Math.hypot(p.juliaX, p.juliaY);
-                        const r = rPrev + 0.1 * dy * p.scale * p.flipPolar * speed;
-                        const fi = Math.atan2(p.juliaY, p.juliaX) - 0.1 * dx * p.scale * p.flipPolar * speed;
-                        if (rPrev > 0 && r < 0 || rPrev < 0 && r > 0)
-                            p.flipPolar *= -1;
-                        p.juliaX = r * Math.cos(fi);
-                        p.juliaY = r * Math.sin(fi);
-                        items.juliaPlot.setPos(p.juliaX, p.juliaY);
-                        redraw = true;
-                        writeHashParams();
+                    else {
+                        // mouse pan, touch pan
+                        const pos = eventPosToElement(event, canv);
+                        const dx = pos.x - prevPos.x;
+                        const dy = -(pos.y - prevPos.y);
+                        prevPos = pos;
+                        const [left, right,] = [1, 2,].map(i => (event.buttons & i) === i);
+                        if (left) {
+                            p.centerX -= dx * p.scale;
+                            p.centerY -= dy * p.scale;
+                            redraw = true;
+                            writeHashParams();
+                        }
+                        if (!p.drawMandelbrot && right) {
+                            //juliaX += 0.1 * dx * scale;
+                            //juliaY += 0.1 * dy * scale;
+                            const slow = event.ctrlKey;
+                            const fast = event.shiftKey;
+                            const speed = slow && fast ? 0.01 : slow ? 0.1 : fast ? 10 : 1;
+                            const rPrev = Math.hypot(p.juliaX, p.juliaY);
+                            const r = rPrev + 0.1 * dy * p.scale * p.flipPolar * speed;
+                            const fi = Math.atan2(p.juliaY, p.juliaX) - 0.1 * dx * p.scale * p.flipPolar * speed;
+                            if (rPrev > 0 && r < 0 || rPrev < 0 && r > 0)
+                                p.flipPolar *= -1;
+                            p.juliaX = r * Math.cos(fi);
+                            p.juliaY = r * Math.sin(fi);
+                            items.juliaPlot.setPos(p.juliaX, p.juliaY);
+                            redraw = true;
+                            writeHashParams();
+                        }
+                        // touch zoom
+                        //console.log(event.clientX, event.clientY);
+                        //event = { touches: [{ pageX: 380, pageY: 315, }, { pageX: event.clientX, pageY: event.clientY, },], };
+                        if (isTouchEvent(event) && event.touches.length >= 2) {
+                            const width2 = Math.hypot(event.touches[1].pageX - event.touches[0].pageX, event.touches[1].pageY - event.touches[0].pageY);
+                            if (width2 !== 0 && lastWidth !== 0) {
+                                const clientRect = canv.getBoundingClientRect();
+                                const prevScale2 = p.scale;
+                                p.scale *= lastWidth / width2;
+                                const dx = Math.min(Math.max(pos.x, 0), clientRect.width) - clientRect.width / 2;
+                                const dy = -(Math.min(Math.max(pos.y, 0), clientRect.height) - clientRect.height / 2);
+                                p.centerX += dx * prevScale2 - dx * p.scale;
+                                p.centerY += dy * prevScale2 - dy * p.scale;
+                                redraw = true;
+                                writeHashParams();
+                            }
+                            lastWidth = width2;
+                        }
                     }
                 }, () => { lastMouseUp = new Date(); });
                 canv.oncontextmenu = () => false;
@@ -1062,7 +1094,7 @@ function t19_julia_gl64() {
 app();
 function app() {
     setStyle(document.body, { padding: "30px 10px 20px 80px", });
-    ac(document.body, myCreateElement("a", { href: "https://github.com/JakubHlavacek/fractals", style: { display: "block", float: "right", marginRight: "50px", width: "24px", height: "24px", }, title: "GitHub", target: "_blank" }, githubIcon()));
+    ac(document.body, myCreateElement("a", { href: "https://github.com/JakubHlavacek/fractals", style: { display: "block", float: "right", marginRight: "50px", width: "24px", height: "24px", }, title: "GitHub" }, githubIcon()));
     ac(document.body, t19_julia_gl64());
 }
 function githubIcon() {

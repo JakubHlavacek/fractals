@@ -329,36 +329,67 @@ function t19_julia_gl64() {
 
 				new ResizeObserver(() => { redraw = true; }).observe(canv);
 				let prevPos = { x: 0, y: 0, };
+				let lastTouchesCount: number;
+				let lastWidth: number;
 				setMouseTracking(canv,
-					event => prevPos = eventPosToElement(event, canv),
+					event => { prevPos = eventPosToElement(event, canv); lastTouchesCount = 0; lastWidth = 0; },
 					event => {
-						const pos = eventPosToElement(event, canv);
-						const dx = pos.x - prevPos.x;
-						const dy = -(pos.y - prevPos.y);
-						prevPos = pos;
-						const [left, right,] = [1, 2,].map(i => ((event as MouseEvent).buttons & i) === i);
-						if (left) {
-							p.centerX -= dx * p.scale;
-							p.centerY -= dy * p.scale;
-							redraw = true;
-							writeHashParams();
-						}
-						if (!p.drawMandelbrot && right) {
-							//juliaX += 0.1 * dx * scale;
-							//juliaY += 0.1 * dy * scale;
-							const slow = event.ctrlKey;
-							const fast = event.shiftKey;
-							const speed = slow && fast ? 0.01 : slow ? 0.1 : fast ? 10 : 1;
-							const rPrev = Math.hypot(p.juliaX, p.juliaY);
-							const r = rPrev + 0.1 * dy * p.scale * p.flipPolar * speed;
-							const fi = Math.atan2(p.juliaY, p.juliaX) - 0.1 * dx * p.scale * p.flipPolar * speed;
-							if (rPrev > 0 && r < 0 || rPrev < 0 && r > 0)
-								p.flipPolar *= -1;
-							p.juliaX = r * Math.cos(fi);
-							p.juliaY = r * Math.sin(fi);
-							items.juliaPlot.setPos(p.juliaX, p.juliaY);
-							redraw = true;
-							writeHashParams();
+						if (isTouchEvent(event) && lastTouchesCount !== event.touches.length) {
+							prevPos = eventPosToElement(event, canv); 
+							lastTouchesCount = event.touches.length;
+							lastWidth = 0;
+						} else {
+							// mouse pan, touch pan
+							const pos = eventPosToElement(event, canv);
+							const dx = pos.x - prevPos.x;
+							const dy = -(pos.y - prevPos.y);
+							prevPos = pos;
+							const [left, right,] = [1, 2,].map(i => ((event as MouseEvent).buttons & i) === i);
+							if (left) {
+								p.centerX -= dx * p.scale;
+								p.centerY -= dy * p.scale;
+								redraw = true;
+								writeHashParams();
+							}
+							if (!p.drawMandelbrot && right) {
+								//juliaX += 0.1 * dx * scale;
+								//juliaY += 0.1 * dy * scale;
+								const slow = event.ctrlKey;
+								const fast = event.shiftKey;
+								const speed = slow && fast ? 0.01 : slow ? 0.1 : fast ? 10 : 1;
+								const rPrev = Math.hypot(p.juliaX, p.juliaY);
+								const r = rPrev + 0.1 * dy * p.scale * p.flipPolar * speed;
+								const fi = Math.atan2(p.juliaY, p.juliaX) - 0.1 * dx * p.scale * p.flipPolar * speed;
+								if (rPrev > 0 && r < 0 || rPrev < 0 && r > 0)
+									p.flipPolar *= -1;
+								p.juliaX = r * Math.cos(fi);
+								p.juliaY = r * Math.sin(fi);
+								items.juliaPlot.setPos(p.juliaX, p.juliaY);
+								redraw = true;
+								writeHashParams();
+							}
+
+							// touch zoom
+							//console.log(event.clientX, event.clientY);
+							//event = { touches: [{ pageX: 380, pageY: 315, }, { pageX: event.clientX, pageY: event.clientY, },], };
+							if (isTouchEvent(event) && event.touches.length >= 2) {
+								const width2 = Math.hypot(event.touches[1].pageX - event.touches[0].pageX, event.touches[1].pageY - event.touches[0].pageY);
+								if (width2 !== 0 && lastWidth !== 0) {
+									const clientRect = canv.getBoundingClientRect();
+									const prevScale2 = p.scale;
+									p.scale *= lastWidth / width2;
+
+									const dx = Math.min(Math.max(pos.x, 0), clientRect.width) - clientRect.width / 2;
+									const dy = -(Math.min(Math.max(pos.y, 0), clientRect.height) - clientRect.height / 2);
+
+									p.centerX += dx * prevScale2 - dx * p.scale;
+									p.centerY += dy * prevScale2 - dy * p.scale;
+
+									redraw = true;
+									writeHashParams();
+								}
+								lastWidth = width2;
+							}
 						}
 					},
 					() => { lastMouseUp = new Date(); }

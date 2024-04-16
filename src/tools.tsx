@@ -163,8 +163,12 @@ function setMouseTracking(elem: HTMLElement, ondown: (event: MouseEvent | TouchE
 }
 function eventPosToElement(e: MouseEvent | TouchEvent | PointerEvent, elem: HTMLElement) {
 	const rect = elem.getBoundingClientRect();
-	const pos = isTouchEvent(e) ? e.touches[0] : e;
+	const pos = isTouchEvent(e) ? {
+		clientX: avg(range(e.touches.length).map(i => e.touches[i].clientX)),
+		clientY: avg(range(e.touches.length).map(i => e.touches[i].clientY)),
+	} : e;
 	return { x: pos.clientX - rect.left, y: pos.clientY - rect.top, };
+	function avg(a: number[]) { return a.reduce((prev, cur) => prev + cur, 0) / a.length; }
 }
 
 
