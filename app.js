@@ -141,7 +141,7 @@ function eventPosToElement(e, elem) {
         clientY: avg(range(e.touches.length).map(i => e.touches[i].clientY)),
     } : e;
     return { x: pos.clientX - rect.left, y: pos.clientY - rect.top, };
-    function avg(a) { return a.reduce((prev, cur) => prev + cur, 0) / a.length; }
+    function avg(a) { return a.reduce((prev, cur) => prev + cur) / a.length; }
 }
 class TSpan {
     static fromSeconds(n) { return TSpan.second * n; }
@@ -603,7 +603,11 @@ function t19_julia_gl64() {
                 let lastTouchesCount;
                 let lastWidth;
                 setMouseTracking(canv, event => { prevPos = eventPosToElement(event, canv); lastTouchesCount = 0; lastWidth = 0; }, event => {
-                    if (isTouchEvent(event) && lastTouchesCount !== event.touches.length) {
+                    const mouse = event.pointerType === "mouse";
+                    const touch = isTouchEvent(event);
+                    if (!mouse && !touch)
+                        return;
+                    if (touch && lastTouchesCount !== event.touches.length) {
                         prevPos = eventPosToElement(event, canv);
                         lastTouchesCount = event.touches.length;
                         lastWidth = 0;
@@ -615,7 +619,7 @@ function t19_julia_gl64() {
                         const dy = -(pos.y - prevPos.y);
                         prevPos = pos;
                         const [left, right,] = [1, 2,].map(i => (event.buttons & i) === i);
-                        if (left) {
+                        if (left || touch) {
                             p.centerX -= dx * p.scale;
                             p.centerY -= dy * p.scale;
                             redraw = true;
@@ -641,12 +645,13 @@ function t19_julia_gl64() {
                         // touch zoom
                         //console.log(event.clientX, event.clientY);
                         //event = { touches: [{ clientX: 380, clientY: 315, }, { clientX: event.clientX, clientY: event.clientY, },], };
-                        if (isTouchEvent(event) && event.touches.length >= 2) {
+                        if (touch && event.touches.length >= 2) {
                             const width2 = Math.hypot(event.touches[1].clientX - event.touches[0].clientX, event.touches[1].clientY - event.touches[0].clientY);
                             if (width2 !== 0 && lastWidth !== 0) {
                                 const clientRect = canv.getBoundingClientRect();
                                 const prevScale2 = p.scale;
                                 p.scale *= lastWidth / width2;
+                                items.spanScale.innerText = (p.scale * spanScaleMultiplier).toExponential(1);
                                 const dx = Math.min(Math.max(pos.x, 0), clientRect.width) - clientRect.width / 2;
                                 const dy = -(Math.min(Math.max(pos.y, 0), clientRect.height) - clientRect.height / 2);
                                 p.centerX += dx * prevScale2 - dx * p.scale;

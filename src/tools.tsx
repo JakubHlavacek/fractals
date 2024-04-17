@@ -168,7 +168,7 @@ function eventPosToElement(e: MouseEvent | TouchEvent | PointerEvent, elem: HTML
 		clientY: avg(range(e.touches.length).map(i => e.touches[i].clientY)),
 	} : e;
 	return { x: pos.clientX - rect.left, y: pos.clientY - rect.top, };
-	function avg(a: number[]) { return a.reduce((prev, cur) => prev + cur, 0) / a.length; }
+	function avg(a: number[]) { return a.reduce((prev, cur) => prev + cur) / a.length; }
 }
 
 
