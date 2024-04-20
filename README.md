@@ -14,12 +14,8 @@ Julia and Mandelbrot set with WebGL2 and float64.<br/>
 - Resizable canvas
 - Parameters stored in url
 
-<div><b>Maybe sometime:</b></div>
-
-- Support mobile browsers
-
 <div><b>Based on:</b></div>
 
 - https://matthias-research.github.io/pages/tenMinutePhysics
 - https://gpfault.net/posts/mandelbrot-webgl.txt.html
-- https://blog.cyclemap.link/2011-06-09-glsl-part2-emu, https://blog.cyclemap.link/2012-02-12-part5, https://www.davidhbailey.com/dhbsoftware
+- https://blog.cyclemap.link/2011-06-09-glsl-part2-emu, https://www.davidhbailey.com/dhbsoftware

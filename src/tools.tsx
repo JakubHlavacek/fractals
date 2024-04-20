@@ -143,25 +143,39 @@ function outerPromise<T>() {
 }
 
 
-function isTouchEvent(e: MouseEvent | TouchEvent | PointerEvent): e is TouchEvent { return (e as TouchEvent).touches !== undefined; }
-function addEventListener2(elem: Node, types: string, fn: (event: MouseEvent) => void, options = false) { types.split(" ").forEach(type => elem.addEventListener(type, fn as EventListener, options)); }
-function removeEventListener2(elem: Node, types: string, fn: (event: MouseEvent) => void, options = false) { types.split(" ").forEach(type => elem.removeEventListener(type, fn as EventListener, options)); }
-function setMouseTracking(elem: HTMLElement, ondown: (event: MouseEvent | TouchEvent | PointerEvent) => void, onmove: (event: MouseEvent | TouchEvent | PointerEvent) => void, onup: (event: MouseEvent | TouchEvent | PointerEvent) => void) {
-	function onmove2(e: MouseEvent | TouchEvent | PointerEvent) { e.preventDefault(); onmove(e); }
-	function onup2(e: MouseEvent | TouchEvent | PointerEvent) {
+function isTouchEvent(e: MouseEvent | PointerEvent | TouchEvent): e is TouchEvent { return (e as TouchEvent).touches !== undefined; }
+function addEventListener2<T extends Event>(elem: Node, types: string, fn: (event: T) => void, options = false) { types.split(" ").forEach(type => elem.addEventListener(type, fn as EventListener, options)); }
+function removeEventListener2<T extends Event>(elem: Node, types: string, fn: (event: T) => void, options = false) { types.split(" ").forEach(type => elem.removeEventListener(type, fn as EventListener, options)); }
+function setMouseTracking(elem: HTMLElement, ondown: (event: PointerEvent | TouchEvent) => void, onmove: (event: PointerEvent | TouchEvent) => void, onup: (event: PointerEvent | TouchEvent) => void) {
+	addEventListener2(elem, "pointerdown touchstart", (e: PointerEvent | TouchEvent) => {
+		e.preventDefault();
+		//console.log(e.type + "-" + (e as PointerEvent).pointerType);
+		if ((e as PointerEvent).pointerType === "touch")
+			return;
+		ondown(e);
+		addEventListener2(document, "pointermove touchmove", onmove2);
+		addEventListener2(document, "pointerup touchend", onup2);
+	});
+	function onmove2(e: PointerEvent | TouchEvent) {
+		e.preventDefault();
+		//console.log(e.type + "-" + (e as PointerEvent).pointerType);
+		if ((e as PointerEvent).pointerType === "touch")
+			return;
+		onmove(e);
+	}
+	function onup2(e: PointerEvent | TouchEvent) {
+		e.preventDefault();
+		//console.log(e.type + "-" + (e as PointerEvent).pointerType);
+		if ((e as PointerEvent).pointerType === "touch")
+			return;
 		if (!isTouchEvent(e) || e.touches.length === 0) {
 			onup(e);
-			removeEventListener2(document, "mousemove touchmove pointermove", onmove2);
-			removeEventListener2(document, "mouseup touchend pointerup", onup2);
+			removeEventListener2(document, "pointermove touchmove", onmove2);
+			removeEventListener2(document, "pointerup touchend", onup2);
 		}
 	}
-	addEventListener2(elem, "mousedown touchstart pointerdown", e => {
-		e.preventDefault(); ondown(e);
-		addEventListener2(document, "mousemove touchmove pointermove", onmove2);
-		addEventListener2(document, "mouseup touchend pointerup", onup2);
-	});
 }
-function eventPosToElement(e: MouseEvent | TouchEvent | PointerEvent, elem: HTMLElement) {
+function eventPosToElement(e: MouseEvent | PointerEvent | TouchEvent, elem: HTMLElement) {
 	const rect = elem.getBoundingClientRect();
 	const pos = isTouchEvent(e) ? {
 		clientX: avg(range(e.touches.length).map(i => e.touches[i].clientX)),

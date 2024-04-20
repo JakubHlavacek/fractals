@@ -119,20 +119,33 @@ function isTouchEvent(e) { return e.touches !== undefined; }
 function addEventListener2(elem, types, fn, options = false) { types.split(" ").forEach(type => elem.addEventListener(type, fn, options)); }
 function removeEventListener2(elem, types, fn, options = false) { types.split(" ").forEach(type => elem.removeEventListener(type, fn, options)); }
 function setMouseTracking(elem, ondown, onmove, onup) {
-    function onmove2(e) { e.preventDefault(); onmove(e); }
+    addEventListener2(elem, "pointerdown touchstart", (e) => {
+        e.preventDefault();
+        //console.log(e.type + "-" + (e as PointerEvent).pointerType);
+        if (e.pointerType === "touch")
+            return;
+        ondown(e);
+        addEventListener2(document, "pointermove touchmove", onmove2);
+        addEventListener2(document, "pointerup touchend", onup2);
+    });
+    function onmove2(e) {
+        e.preventDefault();
+        //console.log(e.type + "-" + (e as PointerEvent).pointerType);
+        if (e.pointerType === "touch")
+            return;
+        onmove(e);
+    }
     function onup2(e) {
+        e.preventDefault();
+        //console.log(e.type + "-" + (e as PointerEvent).pointerType);
+        if (e.pointerType === "touch")
+            return;
         if (!isTouchEvent(e) || e.touches.length === 0) {
             onup(e);
-            removeEventListener2(document, "mousemove touchmove pointermove", onmove2);
-            removeEventListener2(document, "mouseup touchend pointerup", onup2);
+            removeEventListener2(document, "pointermove touchmove", onmove2);
+            removeEventListener2(document, "pointerup touchend", onup2);
         }
     }
-    addEventListener2(elem, "mousedown touchstart pointerdown", e => {
-        e.preventDefault();
-        ondown(e);
-        addEventListener2(document, "mousemove touchmove pointermove", onmove2);
-        addEventListener2(document, "mouseup touchend pointerup", onup2);
-    });
 }
 function eventPosToElement(e, elem) {
     const rect = elem.getBoundingClientRect();
@@ -342,16 +355,22 @@ function t19_julia_gl64() {
                 canvas2d = myCreateElement("canvas", { style: { width: "100%", height: "100%", display: "none", } })),
             myCreateElement("div", { style: { marginTop: "15px", } }, "Controls:"),
             "- Move: ",
+            myCreateElement("b", null, "One finger drag"),
+            " / ",
             myCreateElement("b", null, "Left mouse button drag"),
             ".",
             myCreateElement("br", null),
             "- Zoom: ",
+            myCreateElement("b", null, "Two finger pinch"),
+            " / ",
             myCreateElement("b", null, "Mouse wheel"),
             ". ",
             myCreateElement("b", null, "Shift"),
             " to speed up.",
             myCreateElement("br", null),
             "- Julia c parameter: ",
+            myCreateElement("b", null, "Three finger drag"),
+            " / ",
             myCreateElement("b", null, "Right mouse button drag"),
             ". ",
             myCreateElement("b", null, "Shift"),
@@ -603,10 +622,7 @@ function t19_julia_gl64() {
                 let lastTouchesCount;
                 let lastWidth;
                 setMouseTracking(canv, event => { prevPos = eventPosToElement(event, canv); lastTouchesCount = 0; lastWidth = 0; }, event => {
-                    const mouse = event.pointerType === "mouse";
                     const touch = isTouchEvent(event);
-                    if (!mouse && !touch)
-                        return;
                     if (touch && lastTouchesCount !== event.touches.length) {
                         prevPos = eventPosToElement(event, canv);
                         lastTouchesCount = event.touches.length;
@@ -619,13 +635,13 @@ function t19_julia_gl64() {
                         const dy = -(pos.y - prevPos.y);
                         prevPos = pos;
                         const [left, right,] = [1, 2,].map(i => (event.buttons & i) === i);
-                        if (left || touch) {
+                        if (left || touch && event.touches.length < 3) {
                             p.centerX -= dx * p.scale;
                             p.centerY -= dy * p.scale;
                             redraw = true;
                             writeHashParams();
                         }
-                        if (!p.drawMandelbrot && right) {
+                        if (!p.drawMandelbrot && (right || touch && event.touches.length === 3)) {
                             //juliaX += 0.1 * dx * scale;
                             //juliaY += 0.1 * dy * scale;
                             const slow = event.ctrlKey;
@@ -645,7 +661,7 @@ function t19_julia_gl64() {
                         // touch zoom
                         //console.log(event.clientX, event.clientY);
                         //event = { touches: [{ clientX: 380, clientY: 315, }, { clientX: event.clientX, clientY: event.clientY, },], };
-                        if (touch && event.touches.length >= 2) {
+                        if (touch && event.touches.length === 2) {
                             const width2 = Math.hypot(event.touches[1].clientX - event.touches[0].clientX, event.touches[1].clientY - event.touches[0].clientY);
                             if (width2 !== 0 && lastWidth !== 0) {
                                 const clientRect = canv.getBoundingClientRect();

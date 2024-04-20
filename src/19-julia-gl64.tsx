@@ -56,9 +56,9 @@ function t19_julia_gl64() {
 					{canvas2d = <canvas style={{ width: "100%", height: "100%", display: "none", }} /> as HTMLCanvasElement}
 				</div>
 				<div style={{ marginTop: "15px", }}>Controls:</div>
-				- Move: <b>Left mouse button drag</b>.<br />
-				- Zoom: <b>Mouse wheel</b>. <b>Shift</b> to speed up.<br />
-				- Julia c parameter: <b>Right mouse button drag</b>. <b>Shift</b> to speed up. <b>Ctrl</b> to speed down. <b>Ctrl + Shift</b> to speed down more.<br />
+				- Move: <b>One finger drag</b> / <b>Left mouse button drag</b>.<br />
+				- Zoom: <b>Two finger pinch</b> / <b>Mouse wheel</b>. <b>Shift</b> to speed up.<br />
+				- Julia c parameter: <b>Three finger drag</b> / <b>Right mouse button drag</b>. <b>Shift</b> to speed up. <b>Ctrl</b> to speed down. <b>Ctrl + Shift</b> to speed down more.<br />
 				- Reset settings button adds history entry, so browser back button can be used to revert reset.<br />
 			</div>;
 
@@ -334,11 +334,7 @@ function t19_julia_gl64() {
 				setMouseTracking(canv,
 					event => { prevPos = eventPosToElement(event, canv); lastTouchesCount = 0; lastWidth = 0; },
 					event => {
-						const mouse = (event as PointerEvent).pointerType === "mouse";
 						const touch = isTouchEvent(event);
-						if (!mouse && !touch)
-							return;
-
 						if (touch && lastTouchesCount !== event.touches.length) {
 							prevPos = eventPosToElement(event, canv); 
 							lastTouchesCount = event.touches.length;
@@ -350,13 +346,13 @@ function t19_julia_gl64() {
 							const dy = -(pos.y - prevPos.y);
 							prevPos = pos;
 							const [left, right,] = [1, 2,].map(i => ((event as MouseEvent).buttons & i) === i);
-							if (left || touch) {
+							if (left || touch && event.touches.length < 3) {
 								p.centerX -= dx * p.scale;
 								p.centerY -= dy * p.scale;
 								redraw = true;
 								writeHashParams();
 							}
-							if (!p.drawMandelbrot && right) {
+							if (!p.drawMandelbrot && (right || touch && event.touches.length === 3)) {
 								//juliaX += 0.1 * dx * scale;
 								//juliaY += 0.1 * dy * scale;
 								const slow = event.ctrlKey;
@@ -377,7 +373,7 @@ function t19_julia_gl64() {
 							// touch zoom
 							//console.log(event.clientX, event.clientY);
 							//event = { touches: [{ clientX: 380, clientY: 315, }, { clientX: event.clientX, clientY: event.clientY, },], };
-							if (touch && event.touches.length >= 2) {
+							if (touch && event.touches.length === 2) {
 								const width2 = Math.hypot(event.touches[1].clientX - event.touches[0].clientX, event.touches[1].clientY - event.touches[0].clientY);
 								if (width2 !== 0 && lastWidth !== 0) {
 									const clientRect = canv.getBoundingClientRect();
