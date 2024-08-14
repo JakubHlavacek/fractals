@@ -6,7 +6,7 @@ Julia and Mandelbrot set with WebGL2 and float64.<br/>
 
 - Julia set, Mandelbrot set
 - Computation on: gpu 32 bit / gpu ~64 bit / cpu 64 bit
-- Configurable maximal iteration
+- Using multiple threads in cpu mode
 - Julia c parameter is set with polar coordinate system
 - Other powers of z beside 2 <small>(gpu64 can compute only power 2)</small>
 - Configurable length of z

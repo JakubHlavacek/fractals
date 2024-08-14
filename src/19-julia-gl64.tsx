@@ -103,19 +103,16 @@ function t19_julia_gl64() {
 	function fill() {
 
 		// maybe sometime
-		//		support phone
 		//		animate change of power (without interval -1..1), fullscreen, edit palette
 		//		enhance animation. animation is not smooth, when drawing is slow (part slow and part fast. as if animation handler get wrong time). take into account the expected rendering length. don't render frame 0. is it possible to interrupt rendering on gpu?
 		//		creating flyovers
+		//		canvas resizing on mobile is not working (?)
 		// more fractals: http://usefuljs.net/fractals/docs/index.html, https://en.wikipedia.org/wiki/Mandelbrot_set
 		// more implementations of float64: https://github.com/clickingbuttons/jeditrader/blob/a921a0e/shaders/src/fp64.wgsl (https://github.com/visgl/luma.gl/blob/291a2fdfb1cfdb15405032b3dcbfbe55133ead61/modules/shadertools/src/modules/math/fp64/fp64-arithmetic.glsl.ts)
-		// sources
-		//		https://matthias-research.github.io/pages/tenMinutePhysics
-		//		https://gpfault.net/posts/mandelbrot-webgl.txt.html
-		//		https://blog.cyclemap.link/2011-06-09-glsl-part2-emu, https://blog.cyclemap.link/2012-02-12-part5, https://www.davidhbailey.com/dhbsoftware
 
 		const canvasGl = items.canvasGl;
 		const canvas2d = items.canvas2d;
+		const workersPool: Worker[] = [];
 
 		const spanScaleMultiplier = 600;
 
@@ -160,7 +157,7 @@ function t19_julia_gl64() {
 
 		async function update(t: number) {
 			//if (lastUpdateTime)
-			//	console.log(myRound(t - lastUpdateTime, 4));
+			//	console.log(myRound(t - lastUpdateTime, 4));	// eslint-disable-line no-console
 
 			if (redraw) {
 				redraw = false;
@@ -170,9 +167,10 @@ function t19_julia_gl64() {
 					return;
 
 				if (p.renderMode === 2)
-					//const t = new Date();
-					await drawCpu();
-					//console.log("redraw end", new Date().getTime() - t.getTime());
+					//const t2 = new Date();
+					//await drawCpu();
+					await drawCpuThread();
+					//console.log("redraw end", new Date().getTime() - t2.getTime());	// eslint-disable-line no-console
 				else
 					drawGpu();
 			} else
@@ -224,6 +222,7 @@ function t19_julia_gl64() {
 				items.rangeColSteps.disabled = p.drawMono;
 				items.rangeSuperSamp.value = `${p.superSamp}`;
 				items.spanSuperSamp.innerText = `${p.superSamp ** 2}`;
+				setStyle(canvasGl, { display: p.renderMode === 2 ? "none" : null!, }); setStyle(canvas2d, { display: p.renderMode === 2 ? null! : "none", });
 				items.rangeRenderMode.value = `${p.renderMode}`;
 				items.spanRenderMode.innerText = ["gpu32", "gpu64", "cpu64", "gl128",][p.renderMode];
 				items.rangePower2.setValue(p.power);
@@ -429,7 +428,7 @@ function t19_julia_gl64() {
 
 						redraw = true;
 						writeHashParams();
-					}, TSpan.fromSeconds(0.5), x => x);// bazierEase({ x: .0, y: .0, }, { x: 1., y: 1., }));
+					}, TSpan.fromSeconds(0.5), x => x);// bezierEase({ x: .0, y: .0, }, { x: 1., y: 1., }));
 					await anim.promise;
 					if (againDir !== 0) {
 						auxScale(againDir, againFast, againEvent);
@@ -861,6 +860,233 @@ function t19_julia_gl64() {
 			return p.drawMono
 				? iters < p.maxIters ? [0, 0, 0,] : [255, 192, 0,]
 				: iters < p.maxIters ? getGradientColor(iters) : [0, 0, 0,];
+		}
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		async function drawCpuThread() {
+			if (workersPool.length === 0) {
+
+				const src = `
+					let redraw = false;
+					onmessage = e => {
+						const canvas2d_width = e.data.canvas2d_width;
+						const jFrom = e.data.jFrom;
+						const jTo = e.data.jTo;
+						const cornerX = e.data.cornerX;
+						const cornerY = e.data.cornerY;
+						const p = e.data.p;
+						const gradientColors = setupGradientColors();
+						drawCpu();
+
+						async function drawCpu() {
+							//const ctx = canvas2d.getContext("2d", { willReadFrequently: true })!;
+							//const id = ctx.getImageData(0, 0, canvas2d.width, canvas2d.height);
+							//let t = new Date();
+							//const arr = Array((jTo - jFrom) * canvas2d_width * 4).fill(0);
+							const arr0 = new ArrayBuffer((jTo - jFrom) * canvas2d_width * 4 * 4);
+							const arr = new Float32Array(arr0);
+							let p2 = 0;
+							//const arr = new Float32Array(e.data.sab);
+							//let p2 = jFrom * canvas2d_width * 4;
+
+							//const cornerX = p.centerX - (canvas2d.width - 1) / 2 * p.scale;
+							//const cornerY = p.centerY + (canvas2d.height - 1) / 2 * p.scale;
+							for (let j = jFrom; j < jTo; j++) {
+
+								if (redraw)
+									return;
+								const t2 = new Date();
+								//if (t2.getTime() - t.getTime() > /*TSpan.fromSeconds(0.2)*/200) {
+								//	t = t2;
+								//	//ctx.putImageData(id, 0, 0);
+								//	//await requestAnimationFrameA();
+								//	postMessage({ arr, });
+								//}
+
+								for (let i = 0; i < canvas2d_width; i++) {
+									[arr[p2++], arr[p2++], arr[p2++],] = compSample(cornerX + i * p.scale, cornerY - j * p.scale);
+									arr[p2++] = 255;
+								}
+							}
+
+							//ctx.putImageData(id, 0, 0);
+							postMessage({ arr0, }, [arr0,]);
+						}
+
+						function getItersNon2(x, y, x0, y0) {
+							let rSqPrev = 0;
+							for (let iters = 0; iters < p.maxIters; iters++) {
+								const rSq = x * x + y * y;
+								//if (rSq > zLength * zLength)
+								if (iters > 0 && rSqPrev < rSq && rSq > p.zLength * p.zLength)
+									return iters;
+								rSqPrev = rSq;
+
+								const r = Math.pow(rSq, p.power / 2); 			// z^n = r^n * (cos fi*n + i sin fi*n)
+								const fi = Math.atan2(y, x) * p.power;
+								x = r * Math.cos(fi) + x0;
+								y = r * Math.sin(fi) + y0;
+							}
+							return p.maxIters;
+						}
+						function getIters(x, y, x0, y0) {
+							for (let iters = 0; iters < p.maxIters; iters++) {
+								if (x * x + y * y > p.zLength * p.zLength)
+									return iters;
+
+								const xPrev = x;
+								x = x * x - y * y + x0;				// z^2 + c,  x^2-y^2 + 2xyi
+								y = 2 * xPrev * y + y0;
+							}
+							return p.maxIters;
+						}
+						function getIters2(x, y) {
+							return p.drawMandelbrot
+								? p.power === 2 ? getIters(x, y, x, y) : getItersNon2(x, y, x, y)
+								: p.power === 2 ? getIters(x, y, p.juliaX, p.juliaY) : getItersNon2(x, y, p.juliaX, p.juliaY);
+						}
+
+						function compSample(x, y) {
+							const sampleStep = 1. / p.superSamp;
+							const acc = [0, 0, 0,];
+							for (let i = .0; i < .99; i += sampleStep)
+								for (let j = .0; j < .99; j += sampleStep) {
+									const acc2 = getColor(getIters2(x + p.scale * i, y + p.scale * j));
+									acc[0] += acc2[0];
+									acc[1] += acc2[1];
+									acc[2] += acc2[2];
+								}
+							const d = p.superSamp ** -2;
+							return [acc[0] * d, acc[1] * d, acc[2] * d,];
+						}
+
+						function setupGradientColors() {
+							return [
+								[15, 2, 66,],
+								[191, 41, 12,],
+								[222, 99, 11,],
+								[229, 208, 14,],
+								[255, 255, 255,],
+								[102, 173, 183,],
+								[14, 29, 104,],
+							];
+						}
+						function getGradientColor(iters) {
+							//return [255, (10 * iters) % 256, 0,];
+							//return [255, Math.floor(iters / maxIters * 255), 0,];
+
+							const numCols = gradientColors.length;
+							const col0 = Math.floor(iters / p.colSteps) % numCols;
+							const col1 = (col0 + 1) % numCols;
+							const step = iters % p.colSteps;
+							const color = [0, 0, 0,];
+							for (let i = 0; i < 3; i++) {
+								const c0 = gradientColors[col0][i];
+								const c1 = gradientColors[col1][i];
+								color[i] = Math.floor(c0 + (c1 - c0) / p.colSteps * step);
+							}
+							return color;
+						}
+						${getColor.toString()}
+						//function getColor(iters) {
+						//	return p.drawMono
+						//		? iters < p.maxIters ? [0, 0, 0,] : [255, 192, 0,]
+						//		: iters < p.maxIters ? getGradientColor(iters) : [0, 0, 0,];
+						//}
+					};
+					`;
+				const workerURL = URL.createObjectURL(new Blob([src], { type: "application/javascript", }));
+				const threadsCount = Math.max(1, navigator.hardwareConcurrency - 1);
+				workersPool.push(...range(threadsCount).map(() => new Worker(workerURL)));
+			}
+
+			const ctx = canvas2d.getContext("2d", { willReadFrequently: true })!;
+			const id = ctx.getImageData(0, 0, canvas2d.width, canvas2d.height);
+			//let t = new Date();
+			const cornerX = p.centerX - (canvas2d.width - 1) / 2 * p.scale;
+			const cornerY = p.centerY + (canvas2d.height - 1) / 2 * p.scale;
+
+			const width2 = canvas2d.width;
+			const height2 = canvas2d.height;
+			//const sab = new SharedArrayBuffer(width2 * height2 * 4 * 4);
+			//const arr = new Float32Array(sab);
+
+			/*
+			const promises = workersPool.map((w, i) => {
+				const [jFrom, jTo,] = [Math.round(height2 / workersPool.length * i), Math.round(height2 / workersPool.length * (i + 1)),];
+				const done = outerPromise();
+				w.onmessage = onmessage2;
+				w.postMessage({ canvas2d_width: width2, jFrom, jTo, cornerX, cornerY, p, });
+				function onmessage2(e: MessageEvent) {
+					let p2 = jFrom * width2 * 4;
+					const arr = new Float32Array(e.data.arr0);
+					for (let j = 0; j < arr.length; j++)
+						id.data[p2++] = arr[j];
+					//for (let j = jFrom * width2 * 4; j < jTo * width2 * 4; j++)
+					//	id.data[j] = arr[j];
+
+					done.resolve({});
+				}
+				return done.promise;
+			});
+			await Promise.all(promises);
+
+			ctx.putImageData(id, 0, 0);
+			/**/
+
+
+			//*
+			const chunks = workersPool.length * 5;
+			let t = new Date();
+
+			await doWork(range(chunks).map(i =>
+				w => {
+					//if (redraw)
+					//	return Promise.resolve({});
+					const [jFrom, jTo,] = [Math.round(height2 / chunks * i), Math.round(height2 / chunks * (i + 1)),];
+					const done = outerPromise();
+					w.onmessage = onmessage2;
+					w.postMessage({ canvas2d_width: width2, jFrom, jTo, cornerX, cornerY, p, });
+					function onmessage2(e: MessageEvent) {
+						let p2 = jFrom * width2 * 4;
+						const arr = new Float32Array(e.data.arr0);
+						for (let j = 0; j < arr.length; j++)
+							id.data[p2++] = arr[j];
+						//for (let j = jFrom * width2 * 4; j < jTo * width2 * 4; j++)
+						//	id.data[j] = arr[j];
+						const t2 = new Date();
+						if (t2.getTime() - t.getTime() > TSpan.fromSeconds(0.2)) {
+							t = t2;
+							ctx.putImageData(id, 0, 0);
+						}
+						done.resolve({});
+					}
+					return done.promise;
+				}
+			), workersPool);
+			ctx.putImageData(id, 0, 0);
+
+
+			function doWork(work: ((w: Worker) => Promise<any>)[], workersPool: Worker[]) {
+				if (work.length === 0)
+					return Promise.resolve({});
+				let i = 0;
+				let running = 0;
+				const done = outerPromise<{}>();
+				while (i < workersPool.length && i < work.length)
+					add(i);
+				async function add(workerIdx: number) {
+					running++;
+					await work[i++](workersPool[workerIdx]);
+					running--;
+					if (i < work.length)
+						add(workerIdx);
+					else if (running === 0)
+						done.resolve({});
+				}
+				return done.promise;
+			}/**/
 		}
 	}
 }

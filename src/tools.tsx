@@ -228,7 +228,7 @@ function readHashParamDef<T>(name: string, parse: (s: string) => T, isValid: (v:
 
 
 // https://javascript.info/js-animation, https://cubic-bezier.com
-async function animate(draw: (progress: number) => void, duration = TSpan.fromSeconds(.2), timing = bazierEase({ x: .25, y: .1, }, { x: .25, y: 1, })) {
+async function animate(draw: (progress: number) => void, duration = TSpan.fromSeconds(.2), timing = bezierEase({ x: .25, y: .1, }, { x: .25, y: 1, })) {
 	draw(timing(0));
 	const start = await requestAnimationFrameA();	// performance.now: https://stackoverflow.com/questions/38360250
 	while (true) {
@@ -239,7 +239,7 @@ async function animate(draw: (progress: number) => void, duration = TSpan.fromSe
 			break;
 	}
 }
-function animate2(draw: (progress: number) => void, duration = TSpan.fromSeconds(.2), timing = bazierEase({ x: .25, y: .1, }, { x: .25, y: 1, })) {
+function animate2(draw: (progress: number) => void, duration = TSpan.fromSeconds(.2), timing = bezierEase({ x: .25, y: .1, }, { x: .25, y: 1, })) {
 	const outerPromise2 = outerPromise<void>();
 	let cancelRequest = false;
 	let isCancelled = false;
@@ -288,27 +288,9 @@ function requestAnimationFrameA() {
 
 
 
-function bazierEase(p1: { x: number, y: number, }, p2: { x: number, y: number, }) {
+function bezierEase(p1: { x: number, y: number, }, p2: { x: number, y: number, }) {
 
-	const arr = [0,];
-	const stepArr = 0.05;
-	const stepBaz = 0.05;
-	const baz = bezierEase0(p1, p2);
-	let [prevBaz, nextBaz, tBaz,] = [{ x: 0, y: 0, }, baz(stepBaz), stepBaz,];
-	for (let x = stepArr; x <= 1 - stepArr / 2; x += stepArr) {
-		while (x > nextBaz.x && tBaz < 2) {
-			prevBaz = nextBaz;
-			tBaz += stepBaz;
-			nextBaz = baz(tBaz);
-		}
-		arr.push(linInp(x, prevBaz.x, nextBaz.x, prevBaz.y, nextBaz.y));
-	}
-	arr.push(1);
-
-	return (fraction: number) => {
-		const iLeft = Math.min(Math.max(Math.floor(fraction / stepArr), 0), arr.length - 2);
-		return linInp(fraction, iLeft * stepArr, (iLeft + 1) * stepArr, arr[iLeft], arr[iLeft + 1]);
-	};
+	return resample(0.05, 0.05, bezierEase0(p1, p2));
 
 	// https://stackoverflow.com/questions/16227300, https://github.com/gre/bezier-easing/blob/master/src/index.js
 	function bezierEase0(p1: { x: number, y: number, }, p2: { x: number, y: number, }) {
@@ -322,6 +304,25 @@ function bazierEase(p1: { x: number, y: number, }, p2: { x: number, y: number, }
 			const x = ((aX * t + bX) * t + cX) * t;		// const x = ((aX * t + bX) * t + cX) * t + p0.x;
 			const y = ((aY * t + bY) * t + cY) * t;		// const y = ((aY * t + bY) * t + cY) * t + p0.y;
 			return { x, y, };
+		};
+	}
+
+	function resample(stepX: number, stepT: number, baz: (t: number) => { x: number, y: number, }) {
+		const arr = [0,];
+		let [prevBaz, nextBaz, t,] = [{ x: 0, y: 0, }, baz(stepT), stepT,];
+		for (let x = stepX; x <= 1 - stepX / 2; x += stepX) {
+			while (x > nextBaz.x && t < 2) {
+				prevBaz = nextBaz;
+				t += stepT;
+				nextBaz = baz(t);
+			}
+			arr.push(linInp(x, prevBaz.x, nextBaz.x, prevBaz.y, nextBaz.y));
+		}
+		arr.push(1);
+		return (x: number) => {
+			const iLeft = Math.min(Math.max(Math.floor(x / stepX), 0), arr.length - 2);
+			const y = linInp(x, iLeft * stepX, (iLeft + 1) * stepX, arr[iLeft], arr[iLeft + 1]);
+			return y;
 		};
 	}
 }
