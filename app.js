@@ -1278,8 +1278,8 @@ function t19_julia_gl64() {
             const chunks = workersPool.length * 5;
             let t = new Date();
             await doWork(range(chunks).map(i => w => {
-                //if (redraw)
-                //	return Promise.resolve({});
+                if (redraw)
+                    return Promise.resolve({});
                 const [jFrom, jTo,] = [Math.round(height2 / chunks * i), Math.round(height2 / chunks * (i + 1)),];
                 const done = outerPromise();
                 w.onmessage = onmessage2;
