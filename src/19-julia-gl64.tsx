@@ -133,6 +133,7 @@ function t19_julia_gl64() {
 			flipPolar: 1,
 		};
 		const p = { ...defaultParams, };
+		let prevP = { ...p, };
 
 		let redraw = true;
 		let lastUpdateTime = 0;
@@ -1001,16 +1002,39 @@ function t19_julia_gl64() {
 				workersPool.push(...range(threadsCount).map(() => new Worker(workerURL)));
 			}
 
-			const ctx = canvas2d.getContext("2d", { willReadFrequently: true })!;
-			const id = ctx.getImageData(0, 0, canvas2d.width, canvas2d.height);
-			//let t = new Date();
-			const cornerX = p.centerX - (canvas2d.width - 1) / 2 * p.scale;
-			const cornerY = p.centerY + (canvas2d.height - 1) / 2 * p.scale;
-
 			const width2 = canvas2d.width;
 			const height2 = canvas2d.height;
+
+			const ctx = canvas2d.getContext("2d", { willReadFrequently: true })!;
+			const id = ctx.getImageData(0, 0, width2, height2);
+			//let t = new Date();
+			const cornerX = p.centerX - (width2 - 1) / 2 * p.scale;
+			const cornerY = p.centerY + (height2 - 1) / 2 * p.scale;
+
 			//const sab = new SharedArrayBuffer(width2 * height2 * 4 * 4);
 			//const arr = new Float32Array(sab);
+
+			// copy original image
+			const prevId = new Uint8ClampedArray(id.data);
+			for (let j = 0; j < id.data.length / 4; j++) {
+				const [x, y,] = [j % width2, Math.floor(j / width2),];
+				const worldX = p.centerX + (x - (width2 - 1) / 2) * p.scale;
+				const worldY = p.centerY + (y - (height2 - 1) / 2) * -p.scale;
+				const prevX = Math.round((worldX - prevP.centerX) / prevP.scale + (width2 - 1) / 2);
+				const prevY = Math.round((worldY - prevP.centerY) / -prevP.scale + (height2 - 1) / 2);
+				let p2 = j * 4;
+				if (prevX >= 0 && prevX < width2 && prevY >= 0 && prevY < height2) {
+					let prevP2 = (prevY * width2 + prevX) * 4;
+					id.data[p2++] = prevId[prevP2++];
+					id.data[p2++] = prevId[prevP2++];
+					id.data[p2++] = prevId[prevP2++];
+				} else {
+					id.data[p2++] = 0;
+					id.data[p2++] = 0;
+					id.data[p2++] = 0;
+				}
+			}
+			prevP = { ...p, };
 
 			/*
 			const promises = workersPool.map((w, i) => {
